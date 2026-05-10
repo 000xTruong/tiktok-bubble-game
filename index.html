@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TikTok Live Bubble Game</title>
+  <style>
+    /* ========== RESET & BACKGROUND ========== */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: white;
+      position: relative;
+    }
+
+    /* ========== TRẠNG THÁI KẾT NỐI ========== */
+    .status {
+      position: fixed;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.9rem;
+      opacity: 0.8;
+      background: rgba(255,255,255,0.1);
+      padding: 8px 20px;
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+      z-index: 100;
+    }
+
+    /* ========== BONG BÓNG CHÍNH ========== */
+    .bubble-area {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      flex: 1;
+    }
+
+    .bubble {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #ff6b9d, #c44569, #6c2b7e);
+      box-shadow: 0 0 60px rgba(255, 107, 157, 0.4),
+                  inset 0 -10px 30px rgba(0,0,0,0.2),
+                  inset 0 10px 30px rgba(255,255,255,0.15);
+      transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  height 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  box-shadow 0.4s ease,
+                  background 0.5s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      position: relative;
+      cursor: pointer;
+    }
+
+    /* Hiệu ứng ánh sáng phản chiếu trên bong bóng */
+    .bubble::before {
+      content: '';
+      position: absolute;
+      width: 30%;
+      height: 20%;
+      background: rgba(255,255,255,0.4);
+      border-radius: 50%;
+      top: 15%;
+      left: 20%;
+      filter: blur(3px);
+    }
+
+    /* Hiệu ứng pulse nhẹ */
+    .bubble.pulse {
+      animation: bubblePulse 0.3s ease;
+    }
+    @keyframes bubblePulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+
+    /* Hiệu ứng rung khi nhận gift */
+    .bubble.shake {
+      animation: giftShake 0.6s ease;
+    }
+    @keyframes giftShake {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      15% { transform: translate(-8px, 0) rotate(-5deg); }
+      30% { transform: translate(8px, 0) rotate(5deg); }
+      45% { transform: translate(-6px, 0) rotate(-3deg); }
+      60% { transform: translate(6px, 0) rotate(3deg); }
+      75% { transform: translate(-3px, 0) rotate(-1deg); }
+    }
+
+    /* Hiệu ứng nổ bong bóng */
+    .bubble.explode {
+      animation: explodeAnim 0.8s ease forwards;
+    }
+    @keyframes explodeAnim {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.5); opacity: 0.5; filter: blur(5px); }
+      100% { transform: scale(0); opacity: 0; }
+    }
+
+    /* ========== SỐ LIKE ========== */
+    .like-count {
+      font-size: 2.2rem;
+      font-weight: bold;
+      text-shadow: 0 0 20px rgba(255, 107, 157, 0.8);
+      margin-bottom: 10px;
+    }
+    .like-count .number {
+      font-size: 3rem;
+      background: linear-gradient(45deg, #ff6b9d, #ffd93d);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ========== THANH TIẾN TRÌNH ========== */
+    .progress-section {
+      width: 80%;
+      max-width: 350px;
+      margin-bottom: 30px;
+    }
+    .progress-label {
+      font-size: 0.85rem;
+      opacity: 0.8;
+      margin-bottom: 6px;
+      text-align: center;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 14px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff6b9d, #ffd93d, #6bff9d);
+      border-radius: 10px;
+      transition: width 0.4s ease;
+      box-shadow: 0 0 10px rgba(255, 107, 157, 0.6);
+      width: 0%;
+    }
+
+    /* ========== VÒNG (ROUND) ========== */
+    .round-badge {
+      position: fixed;
+      top: 55px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, #ffd93d, #ff6b6b);
+      color: #1a1a2e;
+      font-weight: bold;
+      font-size: 0.85rem;
+      padding: 5px 18px;
+      border-radius: 15px;
+      z-index: 100;
+    }
+
+    /* ========== TIM BAY LÊN ========== */
+    .heart-float {
+      position: fixed;
+      font-size: 1.6rem;
+      pointer-events: none;
+      z-index: 50;
+      animation: floatUp 2.5s ease-out forwards;
+    }
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
+      50% { opacity: 0.8; transform: translateY(-150px) scale(1.2) rotate(15deg); }
+      100% { opacity: 0; transform: translateY(-350px) scale(0.5) rotate(-10deg); }
+    }
+
+    /* ========== THÔNG BÁO NGƯỜI TẶNG ========== */
+    .gift-notification {
+      position: fixed;
+      top: 50%;
+      left: -400px;
+      transform: translateY(-50%);
+      background: linear-gradient(135deg, rgba(255, 215, 0, 0.9), rgba(255, 107, 157, 0.9));
+      color: #1a1a2e;
+      padding: 12px 25px;
+      border-radius: 0 25px 25px 0;
+      font-weight: bold;
+      font-size: 1rem;
+      z-index: 80;
+      animation: slideInOut 3.5s ease forwards;
+      box-shadow: 0 5px 20px rgba(255, 215, 0, 0.4);
+    }
+    @keyframes slideInOut {
+      0% { left: -400px; }
+      15% { left: 0; }
+      70% { left: 0; }
+      100% { left: -400px; }
+    }
+
+    /* ========== BẢNG XẾP HẠNG TOP GIFTER ========== */
+    .leaderboard {
+      position: fixed;
+      top: 100px;
+      right: 10px;
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(15px);
+      border-radius: 15px;
+      padding: 12px 15px;
+      min-width: 160px;
+      z-index: 90;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .leaderboard-title {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin-bottom: 8px;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .leaderboard-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+      font-size: 0.85rem;
+    }
+    .leaderboard-rank {
+      font-size: 1rem;
+    }
+    .leaderboard-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 80px;
+    }
+    .leaderboard-score {
+      font-weight: bold;
+      color: #ffd93d;
+    }
+
+    /* ========== CONFETTI CANVAS ========== */
+    #confetti-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 200;
+    }
+
+    /* ========== MILESTONE POPUP ========== */
+    .milestone-popup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      font-size: 2.5rem;
+      font-weight: bold;
+      z-index: 300;
+      text-align: center;
+      animation: milestoneAnim 2s ease forwards;
+      text-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+      pointer-events: none;
+    }
+    @keyframes milestoneAnim {
+      0% { transform: translate(-50%, -50%) scale(0) rotate(-10deg); opacity: 0; }
+      20% { transform: translate(-50%, -50%) scale(1.3) rotate(5deg); opacity: 1; }
+      40% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+      80% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1.5) rotate(0deg); opacity: 0; }
+    }
+
+    /* ========== BACKGROUND PARTICLES ========== */
+    .bg-particle {
+      position: fixed;
+      border-radius: 50%;
+      opacity: 0.15;
+      pointer-events: none;
+      animation: bgFloat linear infinite;
+    }
+    @keyframes bgFloat {
+      0% { transform: translateY(100vh) rotate(0deg); }
+      100% { transform: translateY(-100px) rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Trạng thái kết nối -->
+  <div class="status" id="status">⏳ Đang kết nối TikTok Live...</div>
+
+  <!-- Vòng chơi -->
+  <div class="round-badge" id="roundBadge">🫧 Vòng 1</div>
+
+  <!-- Bảng xếp hạng -->
+  <div class="leaderboard" id="leaderboard">
+    <div class="leaderboard-title">🏆 Top Gifter</div>
+    <div id="leaderboardList">
+      <div style="opacity:0.5; font-size:0.8rem; text-align:center;">Chưa có ai</div>
+    </div>
+  </div>
+
+  <!-- Khu vực bong bóng -->
+  <div class="bubble-area">
+    <div class="bubble" id="bubble">🫧</div>
+  </div>
+
+  <!-- Số like -->
+  <div class="like-count">❤️ <span class="number" id="count">0</span></div>
+
+  <!-- Thanh tiến trình -->
+  <div class="progress-section">
+    <div class="progress-label" id="progressLabel">Mốc tiếp theo: 100 ❤️</div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+  </div>
+
+  <!-- Canvas cho confetti -->
+  <canvas id="confetti-canvas"></canvas>
+
+  <!-- ========== PLAYROOM KIT ========== -->
+  <script src="https://unpkg.com/playroomkit/multiplayer.full.umd.js"></script>
+
+  <script>
+    // ========================================
+    //  CẤU HÌNH GAME
+    // ========================================
+    const CONFIG = {
+      bubbleMinSize: 120,       // Kích thước ban đầu (px)
+      bubbleMaxSize: 500,       // Kích thước tối đa trước khi nổ
+      likeSizeIncrease: 0.8,    // Mỗi like tăng bao nhiêu px
+      giftSizeIncrease: 30,     // Mỗi gift tăng bao nhiêu px
+      giftLikeEquivalent: 50,   // 1 gift = bao nhiêu like (cho score)
+      milestones: [100, 250, 500, 1000, 2000, 5000],
+      milestoneEmojis: ['🎉', '🔥', '💥', '🚀', '👑', '🌟'],
+      maxHearts: 15,            // Max tim bay cùng lúc
+      maxBgParticles: 12,       // Hạt nền
+    };
+
+    // ========================================
+    //  BIẾN TRẠNG THÁI
+    // ========================================
+    let totalLikes = 0;
+    let currentRound = 1;
+    let currentMilestoneIndex = 0;
+    let gifters = {};  // { username: { score, photo } }
+    let heartCount = 0;
+
+    // DOM Elements
+    const bubble = document.getElementById('bubble');
+    const countEl = document.getElementById('count');
+    const statusEl = document.getElementById('status');
+    const progressFill = document.getElementById('progressFill');
+    const progressLabel = document.getElementById('progressLabel');
+    const roundBadge = document.getElementById('roundBadge');
+    const leaderboardList = document.getElementById('leaderboardList');
+    const confettiCanvas = document.getElementById('confetti-canvas');
+    const confettiCtx = confettiCanvas.getContext('2d');
+
+    // ========================================
+    //  HẠT NỀN (Background Particles)
+    // ========================================
+    function createBgParticles() {
+      for (let i = 0; i < CONFIG.maxBgParticles; i++) {
+        const p = document.createElement('div');
+        p.className = 'bg-particle';
+        const size = Math.random() * 30 + 10;
+        p.style.width = size + 'px';
+        p.style.height = size + 'px';
+        p.style.left = Math.random() * 100 + '%';
+        p.style.background = `hsl(${Math.random() * 360}, 70%, 60%)`;
+        p.style.animationDuration = (Math.random() * 15 + 10) + 's';
+        p.style.animationDelay = (Math.random() * 10) + 's';
+        document.body.appendChild(p);
+      }
+    }
+    createBgParticles();
+
+    // ========================================
+    //  CẬP NHẬT BONG BÓNG
+    // ========================================
+    function updateBubble() {
+      const progress = (totalLikes % getNextMilestone()) / getNextMilestone();
+      const size = Math.min(
+        CONFIG.bubbleMinSize + totalLikes * CONFIG.likeSizeIncrease,
+        CONFIG.bubbleMaxSize
+      );
+
+      bubble.style.width = size + 'px';
+      bubble.style.height = size + 'px';
+
+      // Emoji thay đổi theo kích thước
+      if (size < 200) bubble.textContent = '🫧';
+      else if (size < 300) bubble.textContent = '🎈';
+      else if (size < 400) bubble.textContent = '🔮';
+      else bubble.textContent = '💣';
+
+      bubble.style.fontSize = Math.max(size / 4, 20) + 'px';
+
+      // Màu gradient thay đổi liên tục
+      const hue = (totalLikes * 3) % 360;
+      bubble.style.background = `radial-gradient(circle at 30% 30%, 
+        hsl(${hue}, 85%, 70%), 
+        hsl(${hue + 40}, 75%, 50%), 
+        hsl(${hue + 80}, 65%, 30%))`;
+      bubble.style.boxShadow = `
+        0 0 ${size * 0.6}px hsla(${hue}, 85%, 60%, 0.35),
+        inset 0 -10px 30px rgba(0,0,0,0.2),
+        inset 0 10px 30px rgba(255,255,255,0.15)`;
+
+      // Cập nhật số
+      countEl.textContent = totalLikes.toLocaleString();
+
+      // Cập nhật progress bar
+      updateProgress();
+
+      // Hiệu ứng pulse
+      bubble.classList.remove('pulse');
+      void bubble.offsetWidth; // trigger reflow
+      bubble.classList.add('pulse');
+
+      // Kiểm tra nổ bong bóng
+      if (size >= CONFIG.bubbleMaxSize) {
+        explodeBubble();
+      }
+
+      // Kiểm tra milestone
+      checkMilestone();
+    }
+
+    // ========================================
+    //  PROGRESS BAR
+    // ========================================
+    function getNextMilestone() {
+      if (currentMilestoneIndex < CONFIG.milestones.length) {
+        return CONFIG.milestones[currentMilestoneIndex];
+      }
+      // Sau khi hết milestone cố định, cứ mỗi 2000 like
+      return CONFIG.milestones[CONFIG.milestones.length - 1] +
+        (currentMilestoneIndex - CONFIG.milestones.length + 1) * 2000;
+    }
+
+    function getPrevMilestone() {
+      if (currentMilestoneIndex === 0) return 0;
+      if (currentMilestoneIndex <= CONFIG.milestones.length) {
+        return CONFIG.milestones[currentMilestoneIndex - 1];
+      }
+      return getNextMilestone() - 2000;
+    }
+
+    function updateProgress() {
+      const next = getNextMilestone();
+      const prev = getPrevMilestone();
+      const progress = Math.min((totalLikes - prev) / (next - prev) * 100, 100);
+      progressFill.style.width = progress + '%';
+      progressLabel.textContent = `Mốc tiếp theo: ${next.toLocaleString()} ❤️`;
+    }
+
+    // ========================================
+    //  KIỂM TRA MILESTONE
+    // ========================================
+    function checkMilestone() {
+      const next = getNextMilestone();
+      if (totalLikes >= next) {
+        const emoji = CONFIG.milestoneEmojis[
+          currentMilestoneIndex % CONFIG.milestoneEmojis.length
+        ];
+        showMilestonePopup(`${emoji} ${next.toLocaleString()} LIKES! ${emoji}`);
+        fireConfetti();
+        currentMilestoneIndex++;
+      }
+    }
+
+    function showMilestonePopup(text) {
+      const popup = document.createElement('div');
+      popup.className = 'milestone-popup';
+      popup.textContent = text;
+      document.body.appendChild(popup);
+      setTimeout(() => popup.remove(), 2500);
+    }
+
+    // ========================================
+    //  NỔ BONG BÓNG → VÒNG MỚI
+    // ========================================
+    function explodeBubble() {
+      bubble.classList.add('explode');
+      fireConfetti();
+      fireConfetti();
+
+      showMilestonePopup(`💥 BOOM! Vòng ${currentRound} hoàn thành!`);
+
+      setTimeout(() => {
+        currentRound++;
+        totalLikes = 0;
+        currentMilestoneIndex = 0;
+        bubble.classList.remove('explode');
+        bubble.style.width = CONFIG.bubbleMinSize + 'px';
+        bubble.style.height = CONFIG.bubbleMinSize + 'px';
+        bubble.textContent = '🫧';
+        roundBadge.textContent = `🫧 Vòng ${currentRound}`;
+        countEl.textContent = '0';
+        updateProgress();
+      }, 1500);
+    }
+
+    // ========================================
+    //  TIM BAY LÊN
+    // ========================================
+    const heartEmojis = ['❤️', '💖', '💗', '💕', '💓', '💝', '🩷', '🩵'];
+
+    function spawnHeart() {
+      if (heartCount >= CONFIG.maxHearts) return;
+      heartCount++;
+
+      const heart = document.createElement('div');
+      heart.className = 'heart-float';
+      heart.textContent = heartEmojis[Math.floor(Math.random() * heartEmojis.length)];
+      heart.style.left = (20 + Math.random() * 60) + '%';
+      heart.style.bottom = '80px';
+      heart.style.fontSize = (1.2 + Math.random() * 1) + 'rem';
+      document.body.appendChild(heart);
+
+      setTimeout(() => {
+        heart.remove();
+        heartCount--;
+      }, 2500);
+    }
+
+    // ========================================
+    //  THÔNG BÁO NGƯỜI TẶNG
+    // ========================================
+    function showGiftNotification(username, giftName) {
+      const noti = document.createElement('div');
+      noti.className = 'gift-notification';
+      noti.textContent = `🎁 ${username || 'Ai đó'} tặng ${giftName || 'quà'}!`;
+      document.body.appendChild(noti);
+      setTimeout(() => noti.remove(), 4000);
+    }
+
+    // ========================================
+    //  BẢNG XẾP HẠNG
+    // ========================================
+    function updateLeaderboard() {
+      const sorted = Object.entries(gifters)
+        .sort((a, b) => b[1].score - a[1].score)
+        .slice(0, 5);
+
+      if (sorted.length === 0) return;
+
+      const rankEmojis = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+      leaderboardList.innerHTML = sorted.map(([name, data], i) =>
+        `<div class="leaderboard-item">
+          <span class="leaderboard-rank">${rankEmojis[i]}</span>
+          <span class="leaderboard-name">${name}</span>
+          <span class="leaderboard-score">${data.score}</span>
+        </div>`
+      ).join('');
+    }
+
+    // ========================================
+    //  CONFETTI (Hiệu ứng giấy rơi)
+    // ========================================
+    let confettiPieces = [];
+
+    function resizeConfettiCanvas() {
+      confettiCanvas.width = window.innerWidth;
+      confettiCanvas.height = window.innerHeight;
+    }
+    resizeConfettiCanvas();
+    window.addEventListener('resize', resizeConfettiCanvas);
+
+    function fireConfetti() {
+      const colors = ['#ff6b9d', '#ffd93d', '#6bff9d', '#6bb5ff', '#ff6bff', '#ff9d6b'];
+      for (let i = 0; i < 80; i++) {
+        confettiPieces.push({
+          x: window.innerWidth / 2,
+          y: window.innerHeight / 2,
+          vx: (Math.random() - 0.5) * 15,
+          vy: (Math.random() - 0.7) * 15,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          size: Math.random() * 8 + 4,
+          rotation: Math.random() * 360,
+          rotSpeed: (Math.random() - 0.5) * 10,
+          gravity: 0.3,
+          life: 1,
+          decay: 0.008 + Math.random() * 0.008,
+        });
+      }
+    }
+
+    function animateConfetti() {
+      confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+
+      confettiPieces = confettiPieces.filter(p => p.life > 0);
+
+      confettiPieces.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += p.gravity;
+        p.vx *= 0.99;
+        p.rotation += p.rotSpeed;
+        p.life -= p.decay;
+
+        confettiCtx.save();
+        confettiCtx.translate(p.x, p.y);
+        confettiCtx.rotate(p.rotation * Math.PI / 180);
+        confettiCtx.globalAlpha = p.life;
+        confettiCtx.fillStyle = p.color;
+        confettiCtx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+        confettiCtx.restore();
+      });
+
+      requestAnimationFrame(animateConfetti);
+    }
+    animateConfetti();
+
+    // ========================================
+    //  XỬ LÝ SỰ KIỆN TIKTOK LIVE
+    // ========================================
+    function handleLike(data) {
+      const likeCount = data.likeCount || 1;
+      totalLikes += likeCount;
+      updateBubble();
+
+      // Spawn tim bay lên (giới hạn để không lag)
+      const heartsToSpawn = Math.min(likeCount, 5);
+      for (let i = 0; i < heartsToSpawn; i++) {
+        setTimeout(() => spawnHeart(), i * 120);
+      }
+    }
+
+    function handleGift(data) {
+      const username = data.username || 'Ẩn danh';
+      const giftName = data.giftName || 'quà';
+
+      // Tăng kích thước bong bóng
+      totalLikes += CONFIG.giftLikeEquivalent;
+      updateBubble();
+
+      // Rung bong bóng
+      bubble.classList.remove('shake');
+      void bubble.offsetWidth;
+      bubble.classList.add('shake');
+
+      // Thông báo
+      showGiftNotification(username, giftName);
+
+      // Cập nhật leaderboard
+      if (!gifters[username]) {
+        gifters[username] = { score: 0 };
+      }
+      gifters[username].score += 1;
+      updateLeaderboard();
+
+      // Tim bay nhiều hơn
+      for (let i = 0; i < 8; i++) {
+        setTimeout(() => spawnHeart(), i * 80);
+      }
+
+      // Mini confetti cho gift
+      for (let i = 0; i < 20; i++) {
+        confettiPieces.push({
+          x: window.innerWidth / 2,
+          y: window.innerHeight / 2,
+          vx: (Math.random() - 0.5) * 10,
+          vy: (Math.random() - 0.5) * 10,
+          color: '#ffd93d',
+          size: Math.random() * 6 + 3,
+          rotation: Math.random() * 360,
+          rotSpeed: (Math.random() - 0.5) * 8,
+          gravity: 0.2,
+          life: 1,
+          decay: 0.015,
+        });
+      }
+    }
+
+    function handleChat(data) {
+      const comment = data.comment || '';
+      // Bạn có thể thêm logic: nếu comment = "boom" thì trigger hiệu ứng đặc biệt
+      if (comment.toLowerCase().includes('boom')) {
+        fireConfetti();
+        showMilestonePopup('💥 BOOM từ chat!');
+      }
+    }
+
+    function handleFollow(data) {
+      const username = data.username || 'Ai đó';
+      showMilestonePopup(`✨ ${username} vừa follow!`);
+      // Thưởng like khi có người follow
+      totalLikes += 10;
+      updateBubble();
+    }
+
+    function handleShare(data) {
+      const username = data.username || 'Ai đó';
+      showMilestonePopup(`📢 ${username} đã share!`);
+      totalLikes += 20;
+      updateBubble();
+      fireConfetti();
+    }
+
+    // ========================================
+    //  KẾT NỐI PLAYROOM + TIKTOK LIVE
+    // ========================================
+    const { insertCoin, onTikTokLiveEvent } = Playroom;
+
+    async function startGame() {
+      try {
+        statusEl.textContent = '⏳ Đang kết nối TikTok Live...';
+
+        await insertCoin({ liveMode: "tiktok" });
+
+        statusEl.textContent = '✅ Đã kết nối! Chờ người xem tương tác...';
+        setTimeout(() => { statusEl.style.opacity = '0.4'; }, 3000);
+
+        onTikTokLiveEvent((event) => {
+          console.log('TikTok Event:', event.type, event.data);
+
+          switch (event.type) {
+            case 'like':
+              handleLike(event.data);
+              break;
+            case 'gift':
+              handleGift(event.data);
+              break;
+            case 'chat':
+              handleChat(event.data);
+              break;
+            case 'follow':
+              handleFollow(event.data);
+              break;
+            case 'share':
+              handleShare(event.data);
+              break;
+          }
+        });
+
+      } catch (e) {
+        statusEl.textContent = '❌ Lỗi: ' + e.message;
+        console.error('Connection error:', e);
+      }
+    }
+
+    startGame();
+
+    // ========================================
+    //  CHẾ ĐỘ TEST (click để thử khi chưa live)
+    // ========================================
+    bubble.addEventListener('click', () => {
+      handleLike({ likeCount: 5 });
+    });
+
+    // Nhấn phím G để test gift
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'g' || e.key === 'G') {
+        handleGift({ username: 'TestUser', giftName: 'Rose' });
+      }
+      if (e.key === 'f' || e.key === 'F') {
+        handleFollow({ username: 'NewFan123' });
+      }
+    });
+  </script>
+</body>
+</html>
