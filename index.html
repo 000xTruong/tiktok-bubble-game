@@ -172,7 +172,7 @@ window.addEventListener('resize', resize);
 const allPlayers = {};
 let visibleList = [];  // top 20, sorted
 
-function getOrCreate(username) {
+function getOrCreate(username, photo) {
   if (!allPlayers[username]) {
     allPlayers[username] = {
       points: 1,
@@ -182,10 +182,23 @@ function getOrCreate(username) {
       vy: (Math.random() - 0.5) * 2,
       hue: Math.floor(Math.random() * 360),
       buffs: { thorn: 0, shield: 0, speed: 0 },
-      lastCollisions: {},   // { otherUser: lastTimestamp } cho va chạm thường
-      lastThornHit: {},     // { otherUser: lastTimestamp } cho gai
+      lastCollisions: {},
+      lastThornHit: {},
+      photo: null,         // ← THÊM MỚI
+      photoImg: null,      // ← THÊM MỚI (cached Image object)
     };
   }
+  // Cập nhật ảnh nếu có (và chưa load)
+  const p = allPlayers[username];
+  if (photo && !p.photo) {
+    p.photo = photo;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = photo;
+    img.onload = () => { p.photoImg = img; };
+  }
+  return p;
+}
   return allPlayers[username];
 }
 
@@ -409,6 +422,26 @@ function draw(now) {
     ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
     ctx.fillStyle = bubbleGrad;
     ctx.fill();
+        // ---- Avatar bên trong bong bóng ----
+    if (p.photoImg) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 0.85, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      const imgSize = r * 1.7;
+      ctx.globalAlpha = 0.55;
+      ctx.drawImage(p.photoImg, p.x - imgSize / 2, p.y - imgSize / 2, imgSize, imgSize);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+
+      // Viền trong cho đẹp
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 0.85, 0, Math.PI * 2);
+      ctx.strokeStyle = `hsla(${p.hue}, 80%, 70%, 0.3)`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
 
     // Speed effect — vòng xoáy
     if (hasSpeed) {
@@ -559,17 +592,19 @@ function drawExplosions(now) {
 // ══════════════════════════════════════
 function handleLike(data) {
   const username = data.username || ('user_' + Math.floor(Math.random() * 9999));
+  const photo = data.userPhotoUrl || null;          // ← THÊM
   const count = data.likeCount || 1;
-  const p = getOrCreate(username);
+  const p = getOrCreate(username, photo);            // ← SỬA
   p.points += count * CFG.POINTS_PER_LIKE;
 }
 
 function handleGift(data) {
   const username = data.username || ('user_' + Math.floor(Math.random() * 9999));
+  const photo = data.userPhotoUrl || null;           // ← THÊM
   const giftName = (data.giftName || '').toLowerCase();
   const giftId = data.giftId || 0;
   const coins = data.diamondCount || data.coins || 0;
-  const p = getOrCreate(username);
+  const p = getOrCreate(username, photo);             // ← SỬA
   const now = Date.now();
 
   // Phân loại gift → buff
@@ -603,20 +638,23 @@ function handleGift(data) {
 function handleChat(data) {
   const username = data.username || ('user_' + Math.floor(Math.random() * 9999));
   // Comment cũng tính như 1 like nhẹ
-  const p = getOrCreate(username);
+  const photo = data.userPhotoUrl || null;           // ← THÊM
+  const p = getOrCreate(username, photo);             // ← SỬA
   p.points += 1;
 }
 
 function handleFollow(data) {
   const username = data.username || 'NewFan';
-  const p = getOrCreate(username);
+  const photo = data.userPhotoUrl || null;           // ← THÊM
+  const p = getOrCreate(username, photo);             // ← SỬA
   p.points += 5;
   addFeed(`✨ ${username} vừa follow! +5 điểm`);
 }
 
 function handleShare(data) {
   const username = data.username || 'Sharer';
-  const p = getOrCreate(username);
+  const photo = data.userPhotoUrl || null;           // ← THÊM
+  const p = getOrCreate(username, photo);             // ← SỬA
   p.points += 10;
   addFeed(`📢 ${username} đã share! +10 điểm`);
 }
