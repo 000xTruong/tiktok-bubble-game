@@ -199,8 +199,6 @@ function getOrCreate(username, photo) {
   }
   return p;
 }
-  return allPlayers[username];
-}
 
 function getRadius(p) {
   return Math.min(CFG.BASE_RADIUS + p.points * CFG.RADIUS_PER_POINT, CFG.MAX_RADIUS);
